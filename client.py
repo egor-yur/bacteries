@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox
 
+buffer = 1024
 name = ""
 color = ""
 root = tk.Tk()
@@ -14,13 +15,46 @@ style = ttk.Style()
 style.theme_use("default")
 
 
+class Grid:
+    def __init__(self, screen, color):
+        self.screen = screen
+        self.x = 0
+        self.y = 0
+        self.start_size = 200
+        self.size = self.start_size
+        self.color = color
+
+    def update(self, parameters: list[int]):
+        x, y, L = parameters
+        self.size = self.start_size // L
+        self.x = -self.size + (-x) % self.size
+        self.y = -self.size + (-y) % self.size
+
+
+    def draw(self):
+        for i in range(WIDTH // self.size + 2):
+            pygame.draw.line(self.screen, self.color,
+                             (self.x + i * self.size, 0),
+                             (self.x + i * self.size, HEIGHT),
+                             1)
+        for i in range(HEIGHT // self.size + 2):
+            pygame.draw.line(self.screen, self.color,
+                             (0, self.y + i * self.size),
+                             (WIDTH, self.y + i * self.size),
+                             1)
+
+
+
 def find(vector: str):
+    global buffer
     first = vector.find("<")
     second = vector.find(">")
     if first < second and first >= 0:
         result = vector[first + 1:second]
         return result
+    buffer = int(buffer * 1.5)
     return ""
+
 
 
 def draw_bacteries(data: list[str]):
@@ -31,6 +65,14 @@ def draw_bacteries(data: list[str]):
         size = int(data[2])
         color = data[3]
         pygame.draw.circle(screen, color, (x, y), size)
+        if len(data) > 4:
+            draw_text(x,y,size // 2, data[4], "black")
+
+def draw_text(x, y, r, text, color):
+    font = pygame.font.Font(None, r)
+    text = font.render(text, True, color)
+    rect = text.get_rect(center=(x, y))
+    screen.blit(text, rect)
 
 
 def scroll(event):
@@ -79,8 +121,8 @@ HEIGHT = 600
 CC = (WIDTH // 2, HEIGHT // 2)
 old = (0, 0)
 radius = 50
-
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+grid = Grid(screen, "seashell4")
 pygame.display.set_caption('Бактерии')
 run = True
 while run:
@@ -98,13 +140,17 @@ while run:
                 old = vector
                 msg = f'<{vector[0]}, {vector[1]}>'
                 sock.send(msg.encode())
-    data = sock.recv(1024).decode()
-    print('Получил:', data)
+    data = sock.recv(buffer).decode()
     data = find(data).split(",")
-    screen.fill('gray')
-    pygame.draw.circle(screen, color, CC, radius)
+    screen.fill('gray25')
     if data != ['']:
-        draw_bacteries(data)
+        parameters = list(map(int, data[0].split(" ")))
+        radius = parameters[0]
+        grid.update(parameters[1:])
+        grid.draw()
+        draw_bacteries(data[1:])
+    pygame.draw.circle(screen, color, CC, radius)
+    draw_text(CC[0], CC[1], radius // 2, name, "black")
     pygame.display.update()
 
 pygame.quit()
